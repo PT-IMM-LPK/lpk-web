@@ -35,7 +35,7 @@ model Pengguna {
   nomor         Int       @id @default(autoincrement())
   nama          String    @db.VarChar(100)
   nomorTelepon  String?   @db.VarChar(20)
-  email         String    @unique @db.VarChar(100)
+  email         String?   @unique @db.VarChar(100)
   password      String    // Untuk login (di-hash)
   tanggalLahir  DateTime?
   role          Role      @default(KARYAWAN)
@@ -55,8 +55,11 @@ model Pengguna {
 // ENUM: ROLE
 // ========================================
 enum Role {
-  KARYAWAN      // Karyawan biasa
-  SUPERVISOR    // Supervisor/Manager
-  ADMIN         // Admin
-  SUPER_ADMIN   // Super Admin
+  KARYAWAN                // Karyawan biasa
+  SUPERVISOR              // Supervisor/Manager
+  SUPER_ADMIN             // Super Admin
+  ADMIN_HEAD_DEPARTEMEN   // Admin Head Departemen (terhubung ke departemen)
+  ADMIN_TRANSPORTASI      // Admin Transportasi
+  ADMIN_GA                // Admin GA
+  ADMIN_GS                // Admin GS
 }

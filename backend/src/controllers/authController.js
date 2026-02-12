@@ -15,23 +15,25 @@ exports.register = async (req, res, next) => {
     } = req.body;
 
     // Validasi input
-    if (!nama || !email || !password) {
+    if (!nama || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Nama, email, dan password wajib diisi'
+        message: 'Nama dan password wajib diisi'
       });
     }
 
-    // Cek email sudah terdaftar
-    const existingUser = await prisma.pengguna.findUnique({
-      where: { email }
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email sudah terdaftar'
+    // Cek email sudah terdaftar (hanya jika email diberikan)
+    if (email && email.trim()) {
+      const existingUser = await prisma.pengguna.findUnique({
+        where: { email }
       });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email sudah terdaftar'
+        });
+      }
     }
 
     // Hash password
@@ -41,7 +43,7 @@ exports.register = async (req, res, next) => {
     const user = await prisma.pengguna.create({
       data: {
         nama,
-        email,
+        email: email && email.trim() ? email : null,
         password: hashedPassword,
         nomorTelepon,
         tanggalLahir: tanggalLahir ? new Date(tanggalLahir) : null,
@@ -114,11 +116,19 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Cek apakah role adalah ADMIN atau SUPER_ADMIN
-    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+    // Cek apakah role adalah admin (semua jenis admin)
+    const allowedRoles = [
+      'SUPER_ADMIN',
+      'ADMIN_HEAD_DEPARTEMEN',
+      'ADMIN_TRANSPORTASI',
+      'ADMIN_GA',
+      'ADMIN_GS'
+    ];
+    
+    if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Hanya Admin dan Super Admin yang dapat login'
+        message: 'Hanya Admin yang dapat login'
       });
     }
 

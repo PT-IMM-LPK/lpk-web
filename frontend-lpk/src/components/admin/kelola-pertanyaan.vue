@@ -16,24 +16,46 @@ const editPertanyaan = ref(false);
 const pertanyaanYangDiedit = ref(null);
 
 // Form state untuk tambah
+const formNamaTabel = ref("");
 const formLabel = ref("");
-const formTipe = ref("text");
-const formPilihanList = ref([""]);
+const formJawabanList = ref([
+  { id: 1, tipe: "text", label: "", pilihan_list: [] }
+]);
 
 // Form state untuk edit
+const formEditNamaTabel = ref("");
 const formEditLabel = ref("");
-const formEditTipe = ref("text");
-const formEditPilihanList = ref([""]);
+const formEditJawabanList = ref([
+  { id: 1, tipe: "text", label: "", pilihan_list: [] }
+]);
+const formEditPilihanList = ref({});
 
 // Daftar pertanyaan (setiap pertanyaan satu kotak)
 const pertanyaanList = ref([
-  { id: 1, label: "Nama Lengkap", tipe: "text", pilihan_list: [] },
-  { id: 2, label: "Tanggal Lahir", tipe: "date", pilihan_list: [] },
+  { 
+    id: 1,
+    nama_tabel: "Nama Lengkap",
+    label: "Nama Lengkap", 
+    jawaban_list: [
+      { id: 1, tipe: "text", label: "Nama" }
+    ]
+  },
+  { 
+    id: 2,
+    nama_tabel: "Tanggal",
+    label: "Tanggal Kegiatan", 
+    jawaban_list: [
+      { id: 1, tipe: "date", label: "Tanggal Mulai" },
+      { id: 2, tipe: "date", label: "Tanggal Selesai" }
+    ]
+  },
   {
     id: 3,
+    nama_tabel: "Jenis Kelamin",
     label: "Jenis Kelamin",
-    tipe: "multiple",
-    pilihan_list: ["Laki-laki", "Perempuan"],
+    jawaban_list: [
+      { id: 1, tipe: "multiple", label: "Pilihan", pilihan_list: ["Laki-laki", "Perempuan"] }
+    ]
   },
 ]);
 
@@ -53,9 +75,11 @@ const getTipeLabel = (tipe) => {
 // Functions
 const openTambahPertanyaan = () => {
   tambahPertanyaan.value = true;
+  formNamaTabel.value = "";
   formLabel.value = "";
-  formTipe.value = "text";
-  formPilihanList.value = [""];
+  formJawabanList.value = [
+    { id: 1, tipe: "text", label: "", pilihan_list: [] }
+  ];
 };
 
 const closeTambahPertanyaan = () => {
@@ -69,11 +93,22 @@ const toggleMobileMenu = () => {
 const openEditPertanyaan = (pertanyaan) => {
   editPertanyaan.value = true;
   pertanyaanYangDiedit.value = pertanyaan;
+  formEditNamaTabel.value = pertanyaan.nama_tabel || "";
   formEditLabel.value = pertanyaan.label;
-  formEditTipe.value = pertanyaan.tipe;
-  formEditPilihanList.value = pertanyaan.pilihan_list?.length
-    ? [...pertanyaan.pilihan_list]
-    : [""];
+  formEditJawabanList.value = pertanyaan.jawaban_list.map(j => ({
+    id: j.id,
+    tipe: j.tipe,
+    label: j.label || "",
+    pilihan_list: j.pilihan_list ? [...j.pilihan_list] : []
+  }));
+  
+  // Initialize pilihanList object for tracking options per jawaban
+  formEditPilihanList.value = {};
+  pertanyaan.jawaban_list.forEach(j => {
+    if (j.tipe === "multiple") {
+      formEditPilihanList.value[j.id] = j.pilihan_list ? [...j.pilihan_list] : [""];
+    }
+  });
 };
 
 const closeEditPertanyaan = () => {
@@ -82,31 +117,55 @@ const closeEditPertanyaan = () => {
 };
 
 const simpanEditPertanyaan = () => {
+  if (!formEditNamaTabel.value.trim()) {
+    alert("Nama tabel tidak boleh kosong!");
+    return;
+  }
+
   if (!formEditLabel.value.trim()) {
     alert("Label pertanyaan tidak boleh kosong!");
     return;
   }
 
-  if (formEditTipe.value === "multiple") {
-    const validOptions = formEditPilihanList.value.filter((opt) => opt.trim());
-    if (validOptions.length < 2) {
-      alert("Pilihan ganda minimal 2 opsi!");
+  if (formEditJawabanList.value.length === 0) {
+    alert("Minimal harus ada 1 jawaban!");
+    return;
+  }
+
+  for (let jawaban of formEditJawabanList.value) {
+    if (jawaban.tipe !== 'multiple' && !jawaban.label.trim()) {
+      alert("Label jawaban tidak boleh kosong!");
       return;
+    }
+    
+    if (jawaban.tipe === "multiple") {
+      const validOptions = formEditPilihanList.value[jawaban.id]?.filter((opt) => opt.trim()) || [];
+      if (validOptions.length < 2) {
+        alert("Pilihan ganda minimal 2 opsi!");
+        return;
+      }
     }
   }
 
   const index = pertanyaanList.value.findIndex(
     (p) => p.id === pertanyaanYangDiedit.value.id,
   );
+  
   if (index > -1) {
+    const updatedJawaban = formEditJawabanList.value.map(j => ({
+      id: j.id,
+      tipe: j.tipe,
+      label: j.tipe === 'multiple' ? "" : j.label,
+      pilihan_list: j.tipe === "multiple" 
+        ? formEditPilihanList.value[j.id].filter((o) => o.trim()) 
+        : []
+    }));
+
     pertanyaanList.value[index] = {
       id: pertanyaanYangDiedit.value.id,
+      nama_tabel: formEditNamaTabel.value,
       label: formEditLabel.value,
-      tipe: formEditTipe.value,
-      pilihan_list:
-        formEditTipe.value === "multiple"
-          ? formEditPilihanList.value.filter((o) => o.trim())
-          : [],
+      jawaban_list: updatedJawaban
     };
   }
 
@@ -121,28 +180,92 @@ const hapusPertanyaan = (pertanyaan) => {
   }
 };
 
+const hapusJawaban = (index) => {
+  if (editPertanyaan.value && formEditJawabanList.value.length > 1) {
+    const jawaban = formEditJawabanList.value[index];
+    delete formEditPilihanList.value[jawaban.id];
+    formEditJawabanList.value.splice(index, 1);
+  } else if (!editPertanyaan.value && formJawabanList.value.length > 1) {
+    formJawabanList.value.splice(index, 1);
+  }
+};
+
+const tambahJawaban = () => {
+  const newId = Math.max(...formJawabanList.value.map(j => j.id), 0) + 1;
+  formJawabanList.value.push({
+    id: newId,
+    tipe: "text",
+    label: "",
+    pilihan_list: []
+  });
+};
+
+const tambahJawabanEdit = () => {
+  const newId = Math.max(...formEditJawabanList.value.map(j => j.id), 0) + 1;
+  formEditJawabanList.value.push({
+    id: newId,
+    tipe: "text",
+    label: "",
+    pilihan_list: []
+  });
+};
+
+const tambahOpsiTambah = (idx) => {
+  const jawaban = formJawabanList.value[idx];
+  if (!jawaban.pilihan_list) {
+    jawaban.pilihan_list = [];
+  }
+  jawaban.pilihan_list.push("");
+};
+
+const tambahOpsiEdit = (jawabanId) => {
+  if (!formEditPilihanList.value[jawabanId]) {
+    formEditPilihanList.value[jawabanId] = [""];
+  }
+  formEditPilihanList.value[jawabanId].push("");
+};
+
 const simpanPertanyaan = () => {
+  if (!formNamaTabel.value.trim()) {
+    alert("Nama tabel tidak boleh kosong!");
+    return;
+  }
+
   if (!formLabel.value.trim()) {
     alert("Label pertanyaan tidak boleh kosong!");
     return;
   }
 
-  if (formTipe.value === "multiple") {
-    const validOptions = formPilihanList.value.filter((opt) => opt.trim());
-    if (validOptions.length < 2) {
-      alert("Pilihan ganda minimal 2 opsi!");
+  if (formJawabanList.value.length === 0) {
+    alert("Minimal harus ada 1 jawaban!");
+    return;
+  }
+
+  for (let jawaban of formJawabanList.value) {
+    if (jawaban.tipe !== 'multiple' && !jawaban.label.trim()) {
+      alert("Label jawaban tidak boleh kosong!");
       return;
+    }
+    
+    if (jawaban.tipe === "multiple") {
+      const validOptions = jawaban.pilihan_list?.filter((opt) => opt.trim()) || [];
+      if (validOptions.length < 2) {
+        alert("Pilihan ganda minimal 2 opsi!");
+        return;
+      }
     }
   }
 
   const newPertanyaan = {
     id: Date.now(),
+    nama_tabel: formNamaTabel.value,
     label: formLabel.value,
-    tipe: formTipe.value,
-    pilihan_list:
-      formTipe.value === "multiple"
-        ? formPilihanList.value.filter((o) => o.trim())
-        : [],
+    jawaban_list: formJawabanList.value.map(j => ({
+      id: j.id,
+      tipe: j.tipe,
+      label: j.tipe === 'multiple' ? "" : j.label,
+      pilihan_list: j.tipe === "multiple" ? (j.pilihan_list?.filter((o) => o.trim()) || []) : []
+    }))
   };
 
   pertanyaanList.value.push(newPertanyaan);
@@ -192,37 +315,55 @@ provide("toggleMobileMenu", toggleMobileMenu);
               >
                 <div class="flex justify-between items-start">
                   <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-2">
+                    <div class="flex items-center gap-3 mb-1">
                       <span class="text-sm font-bold text-black"
                         >{{ idx + 1 }}.</span
                       >
                       <span class="text-sm font-semibold text-black">{{
                         pertanyaan.label
                       }}</span>
-                      <span
-                        class="text-xs text-black bg-gray-200 px-2 py-0.5 rounded"
-                      >
-                        {{ getTipeLabel(pertanyaan.tipe) }}
+                    </div>
+
+                    <!-- Nama Tabel -->
+                    <div class="ml-6 mb-2">
+                      <span class="text-xs text-gray-600">Tabel: </span>
+                      <span class="text-xs font-mono text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
+                        {{ pertanyaan.nama_tabel }}
                       </span>
                     </div>
 
-                    <!-- Tampilkan opsi jika multiple -->
-                    <div
-                      v-if="
-                        pertanyaan.tipe === 'multiple' &&
-                        pertanyaan.pilihan_list.length > 0
-                      "
-                      class="ml-6"
-                    >
-                      <p class="text-xs text-black mb-1">Opsi:</p>
-                      <div class="flex flex-wrap gap-2">
-                        <span
-                          v-for="(opt, i) in pertanyaan.pilihan_list"
-                          :key="i"
-                          class="text-xs text-black bg-white border border-gray-300 px-2 py-1 rounded"
-                        >
-                          {{ opt }}
-                        </span>
+                    <!-- Tampilkan daftar jawaban -->
+                    <div class="ml-6 space-y-2">
+                      <div
+                        v-for="(jawaban, jIdx) in pertanyaan.jawaban_list"
+                        :key="jawaban.id"
+                        class="text-sm text-black bg-white border border-gray-300 px-3 py-2 rounded"
+                      >
+                        <div v-if="jawaban.tipe !== 'multiple'" class="flex items-center gap-2">
+                          <span class="font-medium">{{ jawaban.label }}</span>
+                          <span
+                            class="text-xs text-white bg-[#6444C6] px-2 py-0.5 rounded"
+                          >
+                            {{ getTipeLabel(jawaban.tipe) }}
+                          </span>
+                        </div>
+                        
+                        <!-- Tampilkan opsi jika multiple -->
+                        <div v-if="jawaban.tipe === 'multiple'">
+                          <p class="text-xs text-white bg-[#6444C6] px-2 py-0.5 rounded inline-block mb-1">
+                            {{ getTipeLabel(jawaban.tipe) }}
+                          </p>
+                          <p v-if="jawaban.pilihan_list && jawaban.pilihan_list.length > 0" class="text-xs text-gray-600 mb-1">Opsi:</p>
+                          <div v-if="jawaban.pilihan_list && jawaban.pilihan_list.length > 0" class="flex flex-wrap gap-1">
+                            <span
+                              v-for="(opt, i) in jawaban.pilihan_list"
+                              :key="i"
+                              class="text-xs text-black bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded"
+                            >
+                              {{ opt }}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -280,6 +421,19 @@ provide("toggleMobileMenu", toggleMobileMenu);
                 </div>
 
                 <div class="p-5 space-y-4">
+                  <!-- Nama Tabel -->
+                  <div>
+                    <label class="block text-sm font-semibold text-black mb-2"
+                      >Nama Tabel</label
+                    >
+                    <input
+                      type="text"
+                      v-model="formNamaTabel"
+                      placeholder="Contoh: Nama Peserta"
+                      class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                    />
+                  </div>
+
                   <!-- Label Pertanyaan -->
                   <div>
                     <label class="block text-sm font-semibold text-black mb-2"
@@ -288,64 +442,104 @@ provide("toggleMobileMenu", toggleMobileMenu);
                     <input
                       type="text"
                       v-model="formLabel"
-                      placeholder="Contoh: Nama Lengkap"
+                      placeholder="Contoh: Tanggal Kegiatan"
                       class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
                     />
                   </div>
 
-                  <!-- Tipe Jawaban -->
-                  <div>
-                    <label class="block text-sm font-semibold text-black mb-2"
-                      >Tipe Jawaban</label
+                  <!-- Daftar Jawaban -->
+                  <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <label class="block text-sm font-semibold text-black mb-3"
+                      >Daftar Jawaban</label
                     >
-                    <div class="relative">
-                      <select
-                        v-model="formTipe"
-                        class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black appearance-none focus:outline-none focus:border-[#6444C6]"
-                      >
-                        <option value="text">Input Text</option>
-                        <option value="multiple">Pilihan Ganda</option>
-                        <option value="date">Tanggal</option>
-                      </select>
-                      <ChevronDownIcon
-                        class="absolute right-3 top-3.5 w-4 h-4 text-black pointer-events-none"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Multiple Choice Options -->
-                  <div
-                    v-if="formTipe === 'multiple'"
-                    class="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                  >
-                    <label class="block text-sm font-semibold text-black mb-2"
-                      >Daftar Opsi Pilihan</label
-                    >
-                    <div class="space-y-2">
+                    
+                    <div class="space-y-4">
                       <div
-                        v-for="(opt, i) in formPilihanList"
-                        :key="i"
-                        class="flex gap-2"
+                        v-for="(jawaban, idx) in formJawabanList"
+                        :key="idx"
+                        class="border border-gray-300 rounded-lg p-3 bg-white"
                       >
-                        <input
-                          type="text"
-                          v-model="formPilihanList[i]"
-                          :placeholder="'Opsi ' + (i + 1)"
-                          class="flex-1 p-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
-                        />
+                        <!-- Label Jawaban (hanya jika bukan multiple) -->
+                        <div v-if="jawaban.tipe !== 'multiple'" class="mb-3">
+                          <label class="block text-xs font-semibold text-black mb-1"
+                            >Label Jawaban</label
+                          >
+                          <input
+                            type="text"
+                            v-model="jawaban.label"
+                            :placeholder="'Jawaban ' + (idx + 1) + ' (contoh: Tanggal Mulai)'"
+                            class="w-full p-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                          />
+                        </div>
+
+                        <!-- Tipe Jawaban -->
+                        <div class="relative mb-3">
+                          <label class="block text-xs font-semibold text-black mb-1"
+                            >Tipe Jawaban</label
+                          >
+                          <select
+                            v-model="jawaban.tipe"
+                            class="w-full p-2 border border-gray-300 rounded-lg text-sm text-black appearance-none focus:outline-none focus:border-[#6444C6]"
+                          >
+                            <option value="text">Input Text</option>
+                            <option value="multiple">Pilihan Ganda</option>
+                            <option value="date">Tanggal</option>
+                          </select>
+                          <ChevronDownIcon
+                            class="absolute right-2 top-8 w-4 h-4 text-black pointer-events-none"
+                          />
+                        </div>
+
+                        <!-- Multiple Choice Options (jika tipe = multiple) -->
+                        <div v-if="jawaban.tipe === 'multiple'" class="bg-gray-100 rounded p-2 border border-gray-300 mb-3">
+                          <label class="block text-xs font-semibold text-black mb-2"
+                            >Opsi Pilihan</label
+                          >
+                          <div class="space-y-2">
+                            <div
+                              v-for="(opt, i) in (jawaban.pilihan_list || [])"
+                              :key="i"
+                              class="flex gap-2"
+                            >
+                              <input
+                                type="text"
+                                v-model="jawaban.pilihan_list[i]"
+                                :placeholder="'Opsi ' + (i + 1)"
+                                class="flex-1 p-1.5 border border-gray-300 rounded text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                              />
+                              <button
+                                v-if="jawaban.pilihan_list.length > 1"
+                                @click="jawaban.pilihan_list.splice(i, 1)"
+                                class="px-2 text-red-500 hover:bg-red-50 rounded text-sm"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <button
+                              @click="tambahOpsiTambah(idx)"
+                              class="text-sm text-[#6444C6] font-medium hover:underline w-full text-left"
+                            >
+                              + Tambah opsi
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Hapus Jawaban -->
                         <button
-                          v-if="formPilihanList.length > 1"
-                          @click="formPilihanList.splice(i, 1)"
-                          class="px-3 text-red-500 hover:bg-red-50 rounded-lg text-lg"
+                          v-if="formJawabanList.length > 1"
+                          @click="hapusJawaban(idx)"
+                          class="w-full py-1.5 text-sm font-medium text-red-500 border border-red-300 rounded-lg hover:bg-red-50"
                         >
-                          ×
+                          Hapus Jawaban Ini
                         </button>
                       </div>
+
+                      <!-- Tombol Tambah Jawaban -->
                       <button
-                        @click="formPilihanList.push('')"
-                        class="text-sm text-[#6444C6] font-medium hover:underline"
+                        @click="tambahJawaban"
+                        class="w-full py-2 text-sm text-[#6444C6] font-medium border border-[#6444C6] rounded-lg hover:bg-purple-50"
                       >
-                        + Tambah opsi
+                        + Tambah Jawaban Lain
                       </button>
                     </div>
                   </div>
@@ -392,6 +586,19 @@ provide("toggleMobileMenu", toggleMobileMenu);
                 </div>
 
                 <div class="p-5 space-y-4">
+                  <!-- Nama Tabel -->
+                  <div>
+                    <label class="block text-sm font-semibold text-black mb-2"
+                      >Nama Tabel</label
+                    >
+                    <input
+                      type="text"
+                      v-model="formEditNamaTabel"
+                      placeholder="Contoh: tbl_data_peserta"
+                      class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                    />
+                  </div>
+
                   <!-- Label Pertanyaan -->
                   <div>
                     <label class="block text-sm font-semibold text-black mb-2"
@@ -400,64 +607,112 @@ provide("toggleMobileMenu", toggleMobileMenu);
                     <input
                       type="text"
                       v-model="formEditLabel"
-                      placeholder="Contoh: Nama Lengkap"
+                      placeholder="Contoh: Tanggal Kegiatan"
                       class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
                     />
                   </div>
 
-                  <!-- Tipe Jawaban -->
-                  <div>
-                    <label class="block text-sm font-semibold text-black mb-2"
-                      >Tipe Jawaban</label
+                  <!-- Daftar Jawaban -->
+                  <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <label class="block text-sm font-semibold text-black mb-3"
+                      >Daftar Jawaban</label
                     >
-                    <div class="relative">
-                      <select
-                        v-model="formEditTipe"
-                        class="w-full p-3 border border-gray-300 rounded-lg text-sm text-black appearance-none focus:outline-none focus:border-[#6444C6]"
-                      >
-                        <option value="text">Input Text</option>
-                        <option value="multiple">Pilihan Ganda</option>
-                        <option value="date">Tanggal</option>
-                      </select>
-                      <ChevronDownIcon
-                        class="absolute right-3 top-3.5 w-4 h-4 text-black pointer-events-none"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Multiple Choice Options -->
-                  <div
-                    v-if="formEditTipe === 'multiple'"
-                    class="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                  >
-                    <label class="block text-sm font-semibold text-black mb-2"
-                      >Daftar Opsi Pilihan</label
-                    >
-                    <div class="space-y-2">
+                    
+                    <div class="space-y-4">
                       <div
-                        v-for="(opt, i) in formEditPilihanList"
-                        :key="i"
-                        class="flex gap-2"
+                        v-for="(jawaban, idx) in formEditJawabanList"
+                        :key="idx"
+                        class="border border-gray-300 rounded-lg p-3 bg-white space-y-3"
                       >
-                        <input
-                          type="text"
-                          v-model="formEditPilihanList[i]"
-                          :placeholder="'Opsi ' + (i + 1)"
-                          class="flex-1 p-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
-                        />
-                        <button
-                          v-if="formEditPilihanList.length > 1"
-                          @click="formEditPilihanList.splice(i, 1)"
-                          class="px-3 text-red-500 hover:bg-red-50 rounded-lg text-lg"
+                        <!-- Label Jawaban (hanya jika bukan multiple) -->
+                        <div v-if="jawaban.tipe !== 'multiple'">
+                          <label class="block text-xs font-semibold text-black mb-1"
+                            >Label Jawaban</label
+                          >
+                          <input
+                            type="text"
+                            v-model="jawaban.label"
+                            :placeholder="'Jawaban ' + (idx + 1) + ' (contoh: Tanggal Mulai)'"
+                            class="w-full p-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                          />
+                        </div>
+
+                        <!-- Tipe Jawaban -->
+                        <div class="relative">
+                          <label class="block text-xs font-semibold text-black mb-1"
+                            >Tipe Jawaban</label
+                          >
+                          <select
+                            v-model="jawaban.tipe"
+                            @change="() => {
+                              if (jawaban.tipe === 'multiple' && !formEditPilihanList[jawaban.id]) {
+                                formEditPilihanList[jawaban.id] = [''];
+                              }
+                            }"
+                            class="w-full p-2 border border-gray-300 rounded-lg text-sm text-black appearance-none focus:outline-none focus:border-[#6444C6]"
+                          >
+                            <option value="text">Input Text</option>
+                            <option value="multiple">Pilihan Ganda</option>
+                            <option value="date">Tanggal</option>
+                          </select>
+                          <ChevronDownIcon
+                            class="absolute right-2 top-8 w-4 h-4 text-black pointer-events-none"
+                          />
+                        </div>
+
+                        <!-- Multiple Choice Options -->
+                        <div
+                          v-if="jawaban.tipe === 'multiple'"
+                          class="bg-gray-100 rounded p-2 border border-gray-300"
                         >
-                          ×
+                          <label class="block text-xs font-semibold text-black mb-2"
+                            >Opsi Pilihan</label
+                          >
+                          <div class="space-y-2">
+                            <div
+                              v-for="(opt, i) in (formEditPilihanList[jawaban.id] || [])"
+                              :key="i"
+                              class="flex gap-2"
+                            >
+                              <input
+                                type="text"
+                                v-model="formEditPilihanList[jawaban.id][i]"
+                                :placeholder="'Opsi ' + (i + 1)"
+                                class="flex-1 p-1.5 border border-gray-300 rounded text-sm text-black focus:outline-none focus:border-[#6444C6]"
+                              />
+                              <button
+                                v-if="formEditPilihanList[jawaban.id].length > 1"
+                                @click="formEditPilihanList[jawaban.id].splice(i, 1)"
+                                class="px-2 text-red-500 hover:bg-red-50 rounded text-sm"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <button
+                              @click="tambahOpsiEdit(jawaban.id)"
+                              class="text-sm text-[#6444C6] font-medium hover:underline w-full text-left"
+                            >
+                              + Tambah opsi
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Hapus Jawaban -->
+                        <button
+                          v-if="formEditJawabanList.length > 1"
+                          @click="hapusJawaban(idx)"
+                          class="w-full py-1.5 text-sm font-medium text-red-500 border border-red-300 rounded-lg hover:bg-red-50"
+                        >
+                          Hapus Jawaban Ini
                         </button>
                       </div>
+
+                      <!-- Tombol Tambah Jawaban -->
                       <button
-                        @click="formEditPilihanList.push('')"
-                        class="text-sm text-[#6444C6] font-medium hover:underline"
+                        @click="tambahJawabanEdit"
+                        class="w-full py-2 text-sm text-[#6444C6] font-medium border border-[#6444C6] rounded-lg hover:bg-purple-50"
                       >
-                        + Tambah opsi
+                        + Tambah Jawaban Lain
                       </button>
                     </div>
                   </div>

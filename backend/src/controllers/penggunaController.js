@@ -113,6 +113,14 @@ exports.create = async (req, res, next) => {
       role
     } = req.body;
 
+    // Validate Admin Head Departemen must have departemen
+    if (role === 'ADMIN_HEAD_DEPARTEMEN' && !departemenId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin Head Departemen harus memiliki departemen'
+      });
+    }
+
     // Check for duplicate phone number
     if (nomorTelepon) {
       const existingPhone = await prisma.pengguna.findFirst({
@@ -130,8 +138,8 @@ exports.create = async (req, res, next) => {
       }
     }
 
-    // Check for duplicate email
-    if (email) {
+    // Check for duplicate email (only if email is provided)
+    if (email && email.trim()) {
       const existingEmail = await prisma.pengguna.findFirst({
         where: {
           email,
@@ -153,7 +161,7 @@ exports.create = async (req, res, next) => {
     const pengguna = await prisma.pengguna.create({
       data: {
         nama,
-        email,
+        email: email && email.trim() ? email : null,
         password: hashedPassword,
         nomorTelepon,
         tanggalLahir: tanggalLahir ? new Date(tanggalLahir) : null,
@@ -202,7 +210,7 @@ exports.update = async (req, res, next) => {
     // Build update data
     const updateData = {};
     if (nama) updateData.nama = nama;
-    if (email) updateData.email = email;
+    if (email !== undefined) updateData.email = email && email.trim() ? email : null;
     if (nomorTelepon !== undefined) updateData.nomorTelepon = nomorTelepon;
     if (tanggalLahir) updateData.tanggalLahir = new Date(tanggalLahir);
     if (departemenId !== undefined) {
@@ -210,6 +218,14 @@ exports.update = async (req, res, next) => {
     }
     if (role && req.user.role === 'Admin') {
       updateData.role = role;
+    }
+
+    // Validate Admin Head Departemen must have departemen
+    if (updateData.role === 'ADMIN_HEAD_DEPARTEMEN' && !updateData.departemenId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin Head Departemen harus memiliki departemen'
+      });
     }
 
     // Check for duplicate phone number (exclude current user)
@@ -230,8 +246,8 @@ exports.update = async (req, res, next) => {
       }
     }
 
-    // Check for duplicate email (exclude current user)
-    if (email) {
+    // Check for duplicate email (exclude current user, only if email is provided)
+    if (email && email.trim()) {
       const existingEmail = await prisma.pengguna.findFirst({
         where: {
           email,

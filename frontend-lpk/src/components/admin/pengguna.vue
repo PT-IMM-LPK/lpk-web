@@ -41,7 +41,15 @@ const errorMessage = ref("");
 
 // Data Options untuk Dropdown
 const departemenOptions = ref([]);
-const roleOptions = ref(["Admin", "Super Admin"]);
+const roleOptions = ref([
+  { label: "Super Admin", value: "SUPER_ADMIN" },
+  { label: "Admin Head Departemen", value: "ADMIN_HEAD_DEPARTEMEN" },
+  { label: "Admin Transportasi", value: "ADMIN_TRANSPORTASI" },
+  { label: "Admin GA", value: "ADMIN_GA" },
+  { label: "Admin GS", value: "ADMIN_GS" },
+]);
+const showRoleTextInput = ref(false);
+const customRoleText = ref("");
 
 // State untuk Form Input (Create & Update)
 const formData = reactive({
@@ -123,10 +131,12 @@ const fetchDepartemen = async () => {
 // 1. Tambah Pengguna
 const submitTambah = async () => {
   if (!formData.nama.trim()) return alert("Nama Pengguna tidak boleh kosong");
-  if (!formData.email.trim()) return alert("Email tidak boleh kosong");
   if (!formData.tanggalLahir)
     return alert("Tanggal Lahir tidak boleh kosong (untuk password)");
   if (!formData.role) return alert("Role tidak boleh kosong");
+  if (formData.role === "ADMIN_HEAD_DEPARTEMEN" && !formData.departemenId) {
+    return alert("Departemen harus dipilih untuk Admin Head Departemen");
+  }
 
   // Auto-generate password: nama (lowercase) + tanggalLahir (ddmmyyyy)
   const date = new Date(formData.tanggalLahir);
@@ -171,7 +181,6 @@ const submitTambah = async () => {
 // 2. Update Pengguna
 const submitEdit = async () => {
   if (!formData.nama.trim()) return alert("Nama Pengguna tidak boleh kosong");
-  if (!formData.email.trim()) return alert("Email tidak boleh kosong");
 
   loading.value = true;
   try {
@@ -368,10 +377,25 @@ const sortByField = (field) => {
 // Format role display
 const formatRole = (role) => {
   const roleMap = {
-    ADMIN: "Admin",
     SUPER_ADMIN: "Super Admin",
+    ADMIN_HEAD_DEPARTEMEN: "Admin Head Departemen",
+    ADMIN_TRANSPORTASI: "Admin Transportasi",
+    ADMIN_GA: "Admin GA",
+    ADMIN_GS: "Admin GS",
   };
   return roleMap[role] || role;
+};
+
+// Check if role is Admin Head Departemen
+const isAdminHeadDepartemen = computed(() => {
+  return formData.role === "ADMIN_HEAD_DEPARTEMEN";
+});
+
+// Watch role changes to handle department requirement
+const handleRoleChange = () => {
+  if (formData.role === "ADMIN_HEAD_DEPARTEMEN" && !formData.departemenId) {
+    // Departemen required for Admin Head Departemen
+  }
 };
 
 // Lifecycle
@@ -755,12 +779,15 @@ onMounted(async () => {
                 <div>
                   <label
                     class="block text-base font-medium text-black mb-2 mt-4"
-                    >Departemen</label
-                  >
+                    >Departemen
+                    <span v-if="formData.role === 'ADMIN_HEAD_DEPARTEMEN'" class="text-red-600">*</span>
+                  </label>
                   <div class="relative">
                     <select
                       v-model="formData.departemenId"
+                      @change="handleRoleChange"
                       class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
+                      :class="{ 'border-red-500': formData.role === 'ADMIN_HEAD_DEPARTEMEN' && !formData.departemenId }"
                     >
                       <option value="" disabled>Pilih Departemen</option>
                       <option
@@ -775,6 +802,9 @@ onMounted(async () => {
                       class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
                     />
                   </div>
+                  <p v-if="formData.role === 'ADMIN_HEAD_DEPARTEMEN'" class="text-xs text-red-600 mt-1">
+                    Departemen wajib dipilih untuk Admin Head Departemen
+                  </p>
                 </div>
 
                 <div>
@@ -782,23 +812,35 @@ onMounted(async () => {
                     class="block text-base font-medium text-black mb-2 mt-4"
                     >Role</label
                   >
-                  <div class="relative">
-                    <select
-                      v-model="formData.role"
-                      class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
-                    >
-                      <option value="" disabled>Pilih Role</option>
-                      <option
-                        v-for="role in roleOptions"
-                        :key="role"
-                        :value="role"
+                  <div class="space-y-2">
+                    <div class="relative">
+                      <select
+                        v-model="formData.role"
+                        @change="handleRoleChange"
+                        class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
                       >
-                        {{ role }}
-                      </option>
-                    </select>
-                    <ChevronDownIcon
-                      class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
-                    />
+                        <option value="" disabled>Pilih Role</option>
+                        <option
+                          v-for="role in roleOptions"
+                          :key="role.value"
+                          :value="role.value"
+                        >
+                          {{ role.label }}
+                        </option>
+                      </select>
+                      <ChevronDownIcon
+                        class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
+                      />
+                    </div>
+                    <!-- Custom text input option -->
+                    <div v-if="showRoleTextInput">
+                      <input
+                        v-model="customRoleText"
+                        type="text"
+                        placeholder="Masukkan role custom"
+                        class="w-full p-2 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -916,12 +958,15 @@ onMounted(async () => {
                 <div>
                   <label
                     class="block text-base font-medium text-black mb-2 mt-4"
-                    >Departemen</label
-                  >
+                    >Departemen
+                    <span v-if="formData.role === 'ADMIN_HEAD_DEPARTEMEN'" class="text-red-600">*</span>
+                  </label>
                   <div class="relative">
                     <select
                       v-model="formData.departemenId"
+                      @change="handleRoleChange"
                       class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
+                      :class="{ 'border-red-500': formData.role === 'ADMIN_HEAD_DEPARTEMEN' && !formData.departemenId }"
                     >
                       <option value="" disabled>Pilih Departemen</option>
                       <option
@@ -936,6 +981,9 @@ onMounted(async () => {
                       class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
                     />
                   </div>
+                  <p v-if="formData.role === 'ADMIN_HEAD_DEPARTEMEN'" class="text-xs text-red-600 mt-1">
+                    Departemen wajib dipilih untuk Admin Head Departemen
+                  </p>
                 </div>
 
                 <div>
@@ -943,23 +991,35 @@ onMounted(async () => {
                     class="block text-base font-medium text-black mb-2 mt-4"
                     >Role</label
                   >
-                  <div class="relative">
-                    <select
-                      v-model="formData.role"
-                      class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
-                    >
-                      <option value="" disabled>Pilih Role</option>
-                      <option
-                        v-for="role in roleOptions"
-                        :key="role"
-                        :value="role"
+                  <div class="space-y-2">
+                    <div class="relative">
+                      <select
+                        v-model="formData.role"
+                        @change="handleRoleChange"
+                        class="w-full p-2 pr-10 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20 appearance-none cursor-pointer"
                       >
-                        {{ role }}
-                      </option>
-                    </select>
-                    <ChevronDownIcon
-                      class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
-                    />
+                        <option value="" disabled>Pilih Role</option>
+                        <option
+                          v-for="role in roleOptions"
+                          :key="role.value"
+                          :value="role.value"
+                        >
+                          {{ role.label }}
+                        </option>
+                      </select>
+                      <ChevronDownIcon
+                        class="absolute right-3 top-2.5 w-5 h-5 text-[#C3C3C3] pointer-events-none"
+                      />
+                    </div>
+                    <!-- Custom text input option -->
+                    <div v-if="showRoleTextInput">
+                      <input
+                        v-model="customRoleText"
+                        type="text"
+                        placeholder="Masukkan role custom"
+                        class="w-full p-2 text-sm border border-[#C3C3C3] bg-white text-gray-700 rounded-md focus:outline-none focus:border-[#A90CF8] focus:ring-2 focus:ring-[#A90CF8]/20"
+                      />
+                    </div>
                   </div>
                 </div>
 
